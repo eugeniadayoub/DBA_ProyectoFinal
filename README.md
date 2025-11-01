@@ -52,12 +52,20 @@ DBA_ProyectoFinal/
    - Crea el índice geoespacial.
    - Muestra un ejemplo de documento insertado.
 
-## Notas importantes
 
-- El archivo GeoJSON debe estar en la carpeta `data/` y llamarse exactamente `municipios_pdet_filtrados.geojson`.
-- El script elimina todos los datos previos de la colección antes de insertar nuevos.
-- Si cambias rutas o nombres de archivos, actualiza el script.
+## Visualizar los datos en MongoDB Compass
 
-## Contacto
+Puedes usar [MongoDB Compass](https://www.mongodb.com/products/compass) para explorar los datos cargados:
 
-Para dudas o soporte, contacta a eugeniadayoub.
+1. Abre MongoDB Compass.
+2. Conéctate usando la URI:
+   ```
+   mongodb://localhost:27017/
+   ```
+3. Selecciona la base de datos `proyecto_upme`.
+4. Selecciona la colección `mgn_municipios_pdet`.
+5. Visualiza, filtra y explora los documentos insertados.
+
+Si tienes Docker corriendo y el script se ejecutó correctamente, deberías ver los municipios con los campos:
+`codigo_municipio`, `nombre_municipio`, `departamento`, `geometry`.
+
