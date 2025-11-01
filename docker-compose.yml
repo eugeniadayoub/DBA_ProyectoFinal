@@ -1,0 +1,12 @@
+services:
+  # Define el servicio de MongoDB
+  mongo-upme:
+    image: mongo:latest # Usa la imagen oficial más reciente de Mongo
+    container_name: mongo-proyecto-upme
+    ports:
+      - "27017:27017" # Mapea el puerto de tu PC al puerto del contenedor
+    volumes:
+      - mongo-data:/data/db # Crea un volumen para que tus datos no se borren
+
+volumes:
+  mongo-data: # Define el volumen de persistencia
