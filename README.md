@@ -6,51 +6,46 @@ Este proyecto carga municipios PDET desde un archivo GeoJSON a una base de datos
 
 ```
 DBA_ProyectoFinal/
-├── docker-compose.yml
-├── data/
-│   ├── cargar_municipios.py
-│   ├── municipios_pdet_filtrados.geojson
-│   └── municipios_pdet_filtrados.qmd
+├── setup.sh             <-- Script de automatización
+├── docker-compose.yml   <-- Define los servicios de DB y Python
+└── data/
+    ├── Dockerfile         <-- Define el entorno de Python
+    ├── cargar_municipios.py
+    └── municipios_pdet_filtrados.geojson
 ```
 
 ## Requisitos
 
 - Docker (para MongoDB)
-- Python 3.x
-- Paquete pymongo (`pip install pymongo`) o (`py -m pip install pymongo`)
+- Un entorno de terminal bash (incluido en macOS, Linux, y en Windows a través de Git Bash o WSL).
 
 ## Pasos para ejecutar
 
-1. **Levantar MongoDB con Docker**
+1. **Dar permisos de ejecución al script**
 
    En la raíz del proyecto (`DBA_ProyectoFinal/`):
    
    ```powershell
-   docker-compose up -d
+   chmod +x setup.sh
    ```
-   Esto inicia MongoDB en el puerto 27017.
 
-2. **Instalar dependencias Python**
+2. **Ejecutar el script de configuración**
 
-   En la carpeta `data/`:
+En la raíz del proyecto (`DBA_ProyectoFinal/`):
    
    ```powershell
-   py -m pip install pymongo
+   ./setup.sh
    ```
 
-3. **Ejecutar el script de carga**
+## ¿Qué hace el script setup.sh?
 
-   En la carpeta `data/`:
-   
-   ```powershell
-   py cargar_municipios.py
-   ```
-   El script:
-   - Limpia la colección `mgn_municipios_pdet` en la base `proyecto_upme`.
-   - Lee el archivo `municipios_pdet_filtrados.geojson`.
-   - Inserta los municipios con los campos: `codigo_municipio`, `nombre_municipio`, `departamento`, `geometry`.
-   - Crea el índice geoespacial.
-   - Muestra un ejemplo de documento insertado.
+El script setup.sh se encarga de todo el proceso:
+- Verifica que Docker y Docker Compose estén instalados.
+- Construye la imagen de Python definida en data/Dockerfile (instalando pymongo dentro de ella).
+- Levanta el contenedor de la base de datos mongo-upme.
+- Una vez la base de datos está lista, levanta el contenedor etl-loader, que ejecuta el script cargar_municipios.py para poblar la base de datos.
+- Muestra los logs del script de carga en tu terminal para que puedas ver el progreso.
+Al finalizar, el script etl-loader se detendrá, pero la base de datos mongo-upme quedará corriendo con todos los datos cargados y lista para usarse.
 
 
 ## Visualizar los datos en MongoDB Compass
