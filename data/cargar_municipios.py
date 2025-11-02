@@ -3,7 +3,7 @@ import json
 import os
 
 GEOJSON_FILE = 'municipios_pdet_filtrados.geojson'
-MONGO_URI = 'mongodb://localhost:27017/'
+MONGO_URI = 'mongodb://mongo-upme:27017/'
 DB_NAME = 'proyecto_upme'
 COLLECTION_NAME = 'mgn_municipios_pdet'
 

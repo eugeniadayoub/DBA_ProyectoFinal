@@ -1,12 +1,28 @@
 services:
-  # Define el servicio de MongoDB
+  # Servicio de MongoDB
   mongo-upme:
-    image: mongo:latest # Usa la imagen oficial más reciente de Mongo
+    image: mongo:latest
     container_name: mongo-proyecto-upme
     ports:
-      - "27017:27017" # Mapea el puerto de tu PC al puerto del contenedor
+      - "27017:27017"
     volumes:
-      - mongo-data:/data/db # Crea un volumen para que tus datos no se borren
+      - mongo-data:/data/db
+    networks:
+      - upme-net 
+
+  etl-loader:
+    build: ./data  # <- Le dice a Docker que busque un 'Dockerfile' en la carpeta 'data'
+    container_name: etl-loader-script
+    depends_on:
+      - mongo-upme # Espera a que la BD esté lista
+    networks:
+      - upme-net # <- Se conecta a la misma red que la BD
+    restart: "no" # <- Se ejecuta una vez (el script) y no se reinicia
 
 volumes:
-  mongo-data: # Define el volumen de persistencia
+  mongo-data:
+
+# Definimos la red para que los contenedores se puedan comunicar
+networks:
+  upme-net:
+    driver: bridge
