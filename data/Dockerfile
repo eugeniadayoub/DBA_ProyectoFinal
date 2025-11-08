@@ -9,8 +9,6 @@ WORKDIR /app
 RUN pip install pymongo
 
 # 4. Copiar los archivos necesarios desde tu PC al contenedor
-COPY cargar_municipios.py .
-COPY municipios_pdet_filtrados.geojson .
-
+COPY . .
 # 5. El comando que se ejecutará cuando el contenedor inicie
 CMD ["python3", "cargar_municipios.py"]
