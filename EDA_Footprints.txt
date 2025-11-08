@@ -1,0 +1,150 @@
+======================================================================
+ANÁLISIS EXPLORATORIO DE DATOS (EDA)
+Building Footprints: Google vs Microsoft
+======================================================================
+Fecha: 2025-11-08 21:08:48
+
+✓ Conectado a MongoDB
+  Base de datos: proyecto_upme
+
+======================================================================
+1. RESUMEN GENERAL DE LAS COLECCIONES
+======================================================================
+
+📊 Número de documentos por colección:
+  - Google Open Buildings:      200 edificaciones
+  - Microsoft Building Footprints: 200 edificaciones
+  - Municipios PDET:            101 municipios
+  - Total footprints:           400 edificaciones
+
+======================================================================
+2. ESTRUCTURA Y CAMPOS DE LOS DATASETS
+======================================================================
+
+📋 Google Open Buildings - Campos disponibles:
+  - _id: ObjectId
+  - source: str
+  - latitude: float
+  - longitude: float
+  - area_in_meters: float
+  - confidence: float
+  - full_plus_code: str
+  - geometry_wkt: str
+  - geometry: dict
+  - loaded_at: datetime
+
+📋 Microsoft Building Footprints - Campos disponibles:
+  - _id: ObjectId
+  - source: str
+  - centroid_latitude: float
+  - centroid_longitude: float
+  - geometry: dict
+  - loaded_at: datetime
+
+======================================================================
+3. ANÁLISIS DETALLADO: GOOGLE OPEN BUILDINGS
+======================================================================
+
+📐 Estadísticas de Área (m²):
+  Área mínima:      6.56 m²
+  Área máxima:      2550.45 m²
+  Área promedio:    97.53 m²
+  Área total:       19506.04 m² (1.95 hectáreas)
+
+📊 Distribución de edificaciones por tamaño:
+  0+ m²          :  66 edificaciones (avg: 27.67 m²)
+  50+ m²         :  72 edificaciones (avg: 73.23 m²)
+  100+ m²        :  50 edificaciones (avg: 133.31 m²)
+  200+ m²        :  11 edificaciones (avg: 290.11 m²)
+  1000+ m²       :   1 edificaciones (avg: 2550.45 m²)
+
+🎯 Estadísticas de Confianza (Confidence):
+  Confianza mínima:   0.6512
+  Confianza máxima:   0.9471
+  Confianza promedio: 0.7903
+
+📊 Distribución por nivel de confianza:
+  Confianza 0.6+:  30 edificaciones (15.0%)
+  Confianza 0.7+:  74 edificaciones (37.0%)
+  Confianza 0.8+:  83 edificaciones (41.5%)
+  Confianza 0.9+:  13 edificaciones (6.5%)
+
+🌍 Rangos Geográficos (Coordenadas):
+  Latitud:  0.261145° a 4.818556°
+  Longitud: -73.441730° a -67.558773°
+  Extensión lat: 4.557411° (~505.87 km)
+  Extensión lon: 5.882957° (~653.01 km)
+
+======================================================================
+4. ANÁLISIS DETALLADO: MICROSOFT BUILDING FOOTPRINTS
+======================================================================
+
+📐 Tipos de geometría:
+  Polygon        : 200 edificaciones
+
+🌍 Rangos Geográficos (Centroides calculados):
+  Latitud:  6.049430° a 12.348873°
+  Longitud: -71.497689° a -70.700090°
+  Extensión lat: 6.299443° (~699.24 km)
+  Extensión lon: 0.797599° (~88.53 km)
+
+📊 Complejidad de los polígonos:
+  Vértices mínimos:  5
+  Vértices máximos:  26
+  Vértices promedio: 5.55
+
+======================================================================
+5. COMPARACIÓN: GOOGLE vs MICROSOFT
+======================================================================
+
+📊 Diferencias principales:
+
+  Cantidad:
+    Google:     200 edificaciones
+    Microsoft:  200 edificaciones
+    Diferencia:   0 edificaciones
+
+  Tipo de geometría:
+    Google:     Point (centroide) + WKT Polygon
+    Microsoft:  Polygon (GeoJSON)
+
+  Metadatos:
+    Google:     Área, Confianza, Plus Code
+    Microsoft:  Solo geometría (sin metadatos)
+
+  Índices espaciales:
+    Google:     4 índices
+      - _id_: SON([('_id', 1)])
+      - geometry_2dsphere: SON([('geometry', '2dsphere')])
+      - confidence_1: SON([('confidence', 1)])
+      - area_in_meters_1: SON([('area_in_meters', 1)])
+    Microsoft:  4 índices
+      - _id_: SON([('_id', 1)])
+      - geometry_2dsphere: SON([('geometry', '2dsphere')])
+      - centroid_latitude_1: SON([('centroid_latitude', 1)])
+      - centroid_longitude_1: SON([('centroid_longitude', 1)])
+
+======================================================================
+6. CALIDAD DE DATOS
+======================================================================
+
+🔍 Google Open Buildings:
+  Valores nulos/faltantes:
+    latitude            :   0 (0.0%)
+    longitude           :   0 (0.0%)
+    area_in_meters      :   0 (0.0%)
+    confidence          :   0 (0.0%)
+    geometry            :   0 (0.0%)
+
+  Outliers (área > 1000 m²): 1 (0.5%)
+
+🔍 Microsoft Building Footprints:
+  Valores nulos/faltantes:
+    centroid_latitude   :   0 (0.0%)
+    centroid_longitude  :   0 (0.0%)
+    geometry            :   0 (0.0%)
+
+======================================================================
+✓ ANÁLISIS EXPLORATORIO COMPLETADO
+======================================================================
+
