@@ -2,7 +2,7 @@
 ANÁLISIS EXPLORATORIO DE DATOS (EDA)
 Building Footprints: Google vs Microsoft
 ======================================================================
-Fecha: 2025-11-08 21:08:48
+Fecha: 2025-11-09 16:21:14
 
 ✓ Conectado a MongoDB
   Base de datos: proyecto_upme

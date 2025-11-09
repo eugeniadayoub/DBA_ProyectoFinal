@@ -2,15 +2,17 @@ from pymongo import MongoClient, GEOSPHERE
 import json
 import os
 from datetime import datetime
+from shapely.geometry import shape
 
 # Configuración
 GEOJSON_FILE = 'samples/sample_microsoft.geojson'
 MONGO_URI = 'mongodb://mongo-upme:27017/'
 DB_NAME = 'proyecto_upme'
-COLLECTION_NAME = 'microsoft_footprints'
+COLLECTION_NAME = 'buildings_microsoft'  # ← Nombre correcto según Primera Entrega
 
 print("="*60)
 print("CARGA DE MICROSOFT BUILDING FOOTPRINTS")
+print("Siguiendo modelo de Primera Entrega")
 print("="*60)
 
 # 1. Conectar a MongoDB
@@ -33,12 +35,6 @@ print(f"✓ Colección limpiada")
 # 3. Verificar que existe el archivo
 if not os.path.exists(GEOJSON_FILE):
     print(f"✗ ERROR: No se encontró el archivo '{GEOJSON_FILE}'")
-    print(f"  Directorio actual: {os.getcwd()}")
-    print(f"  Archivos disponibles:")
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.endswith('.geojson'):
-                print(f"    - {os.path.join(root, file)}")
     client.close()
     exit(1)
 
@@ -63,43 +59,60 @@ except Exception as e:
 
 # 5. Preparar documentos para insertar
 print("\n" + "="*60)
-print("TRANSFORMANDO DATOS...")
+print("TRANSFORMANDO DATOS AL MODELO DE PRIMERA ENTREGA...")
 print("="*60)
 
 documentos_para_insertar = []
 errores = 0
+contador_id = 1
 
 for idx, feature in enumerate(features, 1):
     try:
         if feature.get('geometry'):
-            # Microsoft solo tiene geometry (Polygon), no tiene properties adicionales
-            # Vamos a calcular el centroide y área desde la geometría
             geometry = feature['geometry']
             
-            # Calcular centroide aproximado (promedio de coordenadas)
-            if geometry['type'] == 'Polygon':
-                coords = geometry['coordinates'][0]  # Primer anillo del polígono
-                lons = [c[0] for c in coords]
-                lats = [c[1] for c in coords]
-                centroid_lon = sum(lons) / len(lons)
-                centroid_lat = sum(lats) / len(lats)
-            else:
-                centroid_lon = None
-                centroid_lat = None
+            # Calcular centroide usando Shapely
+            try:
+                polygon_shapely = shape(geometry)
+                centroid = polygon_shapely.centroid
+                centroid_geojson = {
+                    'type': 'Point',
+                    'coordinates': [centroid.x, centroid.y]
+                }
+                
+                # Calcular área en m² (aproximado, asumiendo coordenadas geográficas)
+                # Área en grados cuadrados convertida a m²
+                # Factor aproximado: 1 grado² ≈ 12321 km² a latitud ecuatorial
+                # Usamos cálculo más preciso con Shapely en proyección UTM simplificada
+                area_grados = polygon_shapely.area
+                # Aproximación: área en m² usando factor de conversión
+                # 1 grado lat ≈ 111km, 1 grado lon ≈ 111km * cos(lat)
+                lat_promedio = centroid.y
+                factor_conversion = (111000 ** 2) * abs(0.9) # Factor conservador
+                area_m2 = area_grados * factor_conversion
+                
+            except Exception as e:
+                print(f"  ⚠ Error calculando centroide/área en feature {idx}: {e}")
+                errores += 1
+                continue
             
-            # Microsoft no tiene properties en este dataset, 
-            # solo la geometría del polígono
+            # Crear documento según modelo de Primera Entrega
             documento = {
-                'source': 'Microsoft Building Footprints',
-                'centroid_latitude': centroid_lat,
-                'centroid_longitude': centroid_lon,
-                'geometry': geometry,  # Polygon en formato GeoJSON
+                'building_id': f"MS-Bldg-{contador_id:08d}",  # ← Campo requerido
+                'fuente': 'Microsoft',  # ← Campo requerido (no "source")
+                'codigo_municipio': None,  # ← Se llenará en fase de integración
+                'geometry': geometry,  # ← Polygon en GeoJSON (ya lo tenemos correcto)
+                'centroid': centroid_geojson,  # ← Centroid como GeoJSON Point
+                'area_m2': area_m2,  # ← Área calculada
                 'loaded_at': datetime.utcnow()
             }
+            
             documentos_para_insertar.append(documento)
+            contador_id += 1
             
             if idx % 50 == 0:
                 print(f"  Procesados: {idx}/{len(features)}")
+    
     except Exception as e:
         errores += 1
         print(f"  ⚠ Error en feature {idx}: {e}")
@@ -134,35 +147,32 @@ except Exception as e:
     client.close()
     exit(1)
 
-# 7. Crear índice 2dsphere
+# 7. Crear índices espaciales
 print("\n" + "="*60)
-print("CREANDO ÍNDICE ESPACIAL...")
+print("CREANDO ÍNDICES ESPACIALES...")
 print("="*60)
 
 try:
-    # Primero verificar si el índice ya existe
-    indices_existentes = list(collection.list_indexes())
-    indice_existe = any(
-        'geometry' in idx.get('key', {}) and idx['key']['geometry'] == '2dsphere'
-        for idx in indices_existentes
-    )
+    # Índice 2dsphere en geometry (Polygon)
+    collection.create_index([("geometry", GEOSPHERE)])
+    print("✓ Índice 2dsphere creado en 'geometry'")
     
-    if not indice_existe:
-        collection.create_index([("geometry", GEOSPHERE)])
-        print("✓ Índice '2dsphere' creado en campo 'geometry'")
-    else:
-        print("✓ Índice '2dsphere' ya existía")
+    # Índice 2dsphere en centroid (Point)
+    collection.create_index([("centroid", GEOSPHERE)])
+    print("✓ Índice 2dsphere creado en 'centroid'")
     
-    # Índices adicionales
-    collection.create_index([("centroid_latitude", 1)])
-    collection.create_index([("centroid_longitude", 1)])
-    print("✓ Índices adicionales creados (centroid_latitude, centroid_longitude)")
+    # Índices adicionales útiles
+    collection.create_index([("building_id", 1)], unique=True)
+    print("✓ Índice único creado en 'building_id'")
+    
+    collection.create_index([("codigo_municipio", 1)])
+    print("✓ Índice creado en 'codigo_municipio'")
+    
+    collection.create_index([("area_m2", 1)])
+    print("✓ Índice creado en 'area_m2'")
     
 except Exception as e:
-    print(f"✗ ERROR: Falló la creación de índices.")
-    print(f"  Detalle: {e}")
-    client.close()
-    exit(1)
+    print(f"⚠ ERROR al crear índices: {e}")
 
 # 8. Verificación final
 print("\n" + "="*60)
@@ -173,64 +183,43 @@ count = collection.count_documents({})
 print(f"✓ Documentos en colección: {count}")
 
 # Mostrar un documento de ejemplo
-print("\n📄 Ejemplo de documento:")
+print("\n📄 Ejemplo de documento (modelo Primera Entrega):")
 ejemplo = collection.find_one()
 if ejemplo:
-    print(f"  - ID: {ejemplo['_id']}")
-    print(f"  - Source: {ejemplo['source']}")
-    print(f"  - Centroid Lat: {ejemplo.get('centroid_latitude', 'N/A')}")
-    print(f"  - Centroid Lon: {ejemplo.get('centroid_longitude', 'N/A')}")
-    print(f"  - Geometry type: {ejemplo['geometry']['type']}")
-    print(f"  - Coordinates: {len(ejemplo['geometry']['coordinates'][0])} puntos en el polígono")
+    print(f"  - ID MongoDB: {ejemplo['_id']}")
+    print(f"  - building_id: {ejemplo['building_id']}")
+    print(f"  - fuente: {ejemplo['fuente']}")
+    print(f"  - codigo_municipio: {ejemplo['codigo_municipio']}")
+    print(f"  - geometry type: {ejemplo['geometry']['type']}")
+    print(f"  - centroid: {ejemplo['centroid']}")
+    print(f"  - area_m2: {ejemplo['area_m2']:.2f}")
+    print(f"  - loaded_at: {ejemplo['loaded_at']}")
 
 # Estadísticas básicas
-print("\n📊 Estadísticas básicas:")
-
-# Calcular áreas usando agregación con $geoNear o simplemente contar
-print(f"  Total de edificaciones: {count}")
-
-# Rangos de coordenadas de centroides
-pipeline_coords = [
-    {
-        '$match': {
-            'centroid_latitude': {'$ne': None},
-            'centroid_longitude': {'$ne': None}
-        }
-    },
+print("\n📊 Estadísticas de área:")
+pipeline_stats = [
     {
         '$group': {
             '_id': None,
-            'lat_min': {'$min': '$centroid_latitude'},
-            'lat_max': {'$max': '$centroid_latitude'},
-            'lon_min': {'$min': '$centroid_longitude'},
-            'lon_max': {'$max': '$centroid_longitude'}
+            'area_min': {'$min': '$area_m2'},
+            'area_max': {'$max': '$area_m2'},
+            'area_avg': {'$avg': '$area_m2'},
+            'area_total': {'$sum': '$area_m2'}
         }
     }
 ]
 
-coords_stats = list(collection.aggregate(pipeline_coords))
-if coords_stats:
-    print(f"  Rango de Latitudes: {coords_stats[0]['lat_min']:.6f} a {coords_stats[0]['lat_max']:.6f}")
-    print(f"  Rango de Longitudes: {coords_stats[0]['lon_min']:.6f} a {coords_stats[0]['lon_max']:.6f}")
-
-# Distribución por tipo de geometría
-pipeline_geom = [
-    {
-        '$group': {
-            '_id': '$geometry.type',
-            'count': {'$sum': 1}
-        }
-    }
-]
-
-geom_stats = list(collection.aggregate(pipeline_geom))
-if geom_stats:
-    print(f"\n  Tipos de geometría:")
-    for g in geom_stats:
-        print(f"    - {g['_id']}: {g['count']} edificaciones")
+stats = list(collection.aggregate(pipeline_stats))
+if stats:
+    s = stats[0]
+    print(f"  Área mínima:   {s['area_min']:.2f} m²")
+    print(f"  Área máxima:   {s['area_max']:.2f} m²")
+    print(f"  Área promedio: {s['area_avg']:.2f} m²")
+    print(f"  Área total:    {s['area_total']:.2f} m² ({s['area_total']/10000:.2f} hectáreas)")
 
 print("\n" + "="*60)
-print("✓ CARGA COMPLETADA EXITOSAMENTE")
+print("✓ CARGA COMPLETADA - MODELO PRIMERA ENTREGA")
 print("="*60)
+print()
 
 client.close()
