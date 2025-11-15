@@ -160,6 +160,12 @@ def main():
 
     # elegir salida: $out (por defecto) o $merge cuando NO_DROP=1
     if NO_DROP != '1':
+        # Hacer drop explícito de la colección destino para comportarse igual que la carga de municipalities
+        try:
+            print(f"Limpiando colección destino antes del pipeline: {OUT_COLL}")
+            outcol.drop()
+        except Exception as e:
+            print(f"Warning: no se pudo borrar la colección destino antes del pipeline: {e}")
         final_stage = { '$out': OUT_COLL }
         print(f"Se sobrescribirá (OUT) la colección destino: {OUT_COLL}")
     else:
