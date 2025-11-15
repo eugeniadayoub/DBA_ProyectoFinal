@@ -1,28 +1,35 @@
 services:
-  # Servicio de MongoDB
   mongo-upme:
     image: mongo:latest
     container_name: mongo-proyecto-upme
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongo_data:/data/db
     networks:
-      - upme-net 
+      - upme-network
+    command: mongod --bind_ip_all
 
   etl-loader:
-    build: ./data  # <- Le dice a Docker que busque un 'Dockerfile' en la carpeta 'data'
+    build:
+      context: ./data
+      dockerfile: Dockerfile
     container_name: etl-loader-script
     depends_on:
-      - mongo-upme # Espera a que la BD esté lista
+      - mongo-upme
+    environment:
+      - MONGO_URI=mongodb://mongo-upme:27017
+      - MGN_ZIP_PATH=/app/MGN2024_00_COLOMBIA.zip
+      - ONEDRIVE_URL=https://drive.google.com/uc?export=download&id=1s4chbFTk9WGp_c7bbeWM8xGJhn0kttHg
     networks:
-      - upme-net # <- Se conecta a la misma red que la BD
-    restart: "no" # <- Se ejecuta una vez (el script) y no se reinicia
+      - upme-network
+    volumes:
+      - ./data:/app
+    command: bash -c "/app/run_etl.sh"
 
 volumes:
-  mongo-data:
+  mongo_data:
 
-# Definimos la red para que los contenedores se puedan comunicar
 networks:
-  upme-net:
+  upme-network:
     driver: bridge

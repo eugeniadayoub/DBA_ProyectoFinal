@@ -1,17 +1,34 @@
-# 1. Usar una imagen oficial de Python
 FROM python:3.10-slim
 
-# 2. Establecer el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# 3. Instalar las dependencias de Python
-# Agregamos Shapely para manipulación de geometrías (WKT, centroides, áreas)
-RUN pip install pymongo shapely
+# Instalar GDAL y dependencias geoespaciales
+RUN apt-get update && apt-get install -y \
+    binutils \
+    libproj-dev \
+    gdal-bin \
+    curl \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# 4. Copiar TODOS los archivos de la carpeta data al contenedor
-# Esto incluye: scripts .py, archivos .geojson, y la carpeta samples/
+# Instalar dependencias Python
+RUN pip install --no-cache-dir \
+    pymongo \
+    shapely \
+    fiona \
+    pyproj \
+    tqdm \
+    pandas \
+    openpyxl \
+    gdown
+
+# Copiar TODO el contenido de data/ al contenedor
 COPY . .
 
-# 5. El comando que se ejecutará cuando el contenedor inicie
-# Este es el comando por defecto, pero puede ser sobrescrito
+# Hacer ejecutable el script setup
+RUN chmod +x setup.sh
+RUN chmod +x run_etl.sh
+
+# Comando por defecto
 CMD ["python3", "cargar_municipios.py"]
