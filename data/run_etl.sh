@@ -45,6 +45,32 @@ fi
 echo "[ETL] Ejecutando: cargar_microsoft_footprints.py"
 python3 /app/cargar_microsoft_footprints.py
 
+# ================================================
+# Descargar y cargar footprints Google
+# ================================================
+echo "[ETL] Verificando Google footprints..."
+GOOGLE_FILE="${GOOGLE_INPUT_FILE:-samples/google_buildings.geojson}"
+if [ ! -f "/app/$GOOGLE_FILE" ]; then
+	echo "[ETL] Google footprints no encontrados. Intentando descargar y convertir..."
+	if [ -x /app/scripts/download_google.sh ]; then
+		/app/scripts/download_google.sh
+	else
+		sh /app/scripts/download_google.sh || true
+	fi
+	
+	# Convertir CSV.GZ a GeoJSON
+	echo "[ETL] Convirtiendo Google CSV.GZ a GeoJSON..."
+	python3 /app/scripts/convert_csv_to_geojson.py \
+		/app/samples/google_part1.csv.gz \
+		/app/samples/google_part2.csv.gz \
+		/app/samples/google_part3.csv.gz \
+		/app/samples/google_part4.csv.gz \
+		/app/samples/google_buildings.geojson
+fi
+
+echo "[ETL] Ejecutando: cargar_google_footprints.py"
+python3 /app/cargar_google_footprints.py
+
 echo "[ETL] Pipeline finalizado."
 
 # Mantener salida de contenedor limpia
