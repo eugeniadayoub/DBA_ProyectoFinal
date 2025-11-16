@@ -5,12 +5,13 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - dba_proyectofinal_mongo_data:/data/db
     networks:
       - upme-network
     command: mongod --bind_ip_all
 
   etl-loader:
+    platform: linux/amd64
     build:
       context: ./data
       dockerfile: Dockerfile
@@ -26,10 +27,10 @@ services:
       - upme-network
     volumes:
       - ./data:/app
-    command: bash -c "/app/run_etl.sh"
+    command: bash -c "dos2unix /app/run_etl.sh && chmod +x /app/run_etl.sh && /app/run_etl.sh"
 
 volumes:
-  mongo_data:
+  dba_proyectofinal_mongo_data:
 
 networks:
   upme-network:

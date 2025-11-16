@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM --platform=linux/amd64 python:3.10-slim
 
 WORKDIR /app
 
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     wget \
     ca-certificates \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias Python
@@ -23,12 +24,10 @@ RUN pip install --no-cache-dir \
     openpyxl \
     gdown
 
-# Copiar TODO el contenido de data/ al contenedor
+# Copiar todo
 COPY . .
 
-# Hacer ejecutable el script setup
-RUN chmod +x setup.sh
-RUN chmod +x run_etl.sh
+# Dar permisos a scripts dentro del contenedor
+RUN chmod +x /app/*.sh && chmod +x /app/scripts/*.sh
 
-# Comando por defecto
-CMD ["python3", "cargar_municipios.py"]
+CMD ["bash"]
