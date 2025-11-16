@@ -5,10 +5,10 @@ from datetime import datetime
 from shapely.geometry import shape
 
 # Configuración
-GEOJSON_FILE = 'samples/sample_microsoft.geojson'
-MONGO_URI = 'mongodb://mongo-upme:27017/'
-DB_NAME = 'proyecto_upme'
-COLLECTION_NAME = 'buildings_microsoft'  # ← Nombre correcto según Primera Entrega
+GEOJSON_FILE = os.getenv('MICROSOFT_INPUT_FILE', 'samples/sample_microsoft.geojson')
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb://mongo-upme:27017/')
+DB_NAME = os.getenv('DB_NAME', 'dba_proyectofinal')
+COLLECTION_NAME = 'buildings_microsoft'
 
 print("="*60)
 print("CARGA DE MICROSOFT BUILDING FOOTPRINTS")
@@ -38,21 +38,76 @@ if not os.path.exists(GEOJSON_FILE):
     client.close()
     exit(1)
 
-# 4. Leer el GeoJSON
+# 4. Leer el GeoJSON (FeatureCollection) en streaming - extrae cada Feature sin cargar todo en memoria
+def iter_features_from_featurecollection(path):
+    """Generador que itera Features desde un GeoJSON FeatureCollection en streaming.
+    Busca la clave "features" y luego extrae objetos JSON delimitados por llaves { }.
+    """
+    with open(path, 'r', encoding='utf-8') as f:
+        # Buscar la posición del array "features"
+        buf = ''
+        while True:
+            chunk = f.read(8192)
+            if not chunk:
+                return
+            buf += chunk
+            idx = buf.find('"features"')
+            if idx != -1:
+                # avanzar hasta el '[' del array
+                arr_idx = buf.find('[', idx)
+                if arr_idx != -1:
+                    # mover el cursor del archivo a la posición después del '['
+                    # calculamos cuánto de buf corresponde al resto del archivo
+                    consumed = len(buf[:arr_idx+1])
+                    # retroceder el archivo al inicio + consumed
+                    f.seek(f.tell() - len(buf) + consumed)
+                    break
+        # Ahora estamos justo después del '[' que inicia el array de features
+        depth = 0
+        in_str = False
+        escape = False
+        obj_buf = ''
+        while True:
+            ch = f.read(1)
+            if not ch:
+                break
+            if in_str:
+                obj_buf += ch
+                if escape:
+                    escape = False
+                elif ch == '\\':
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '{':
+                depth += 1
+                obj_buf += ch
+            elif ch == '}':
+                depth -= 1
+                obj_buf += ch
+                if depth == 0:
+                    # finalizó un objeto Feature
+                    try:
+                        yield json.loads(obj_buf)
+                    except Exception:
+                        pass
+                    obj_buf = ''
+            elif ch == '"':
+                in_str = True
+                obj_buf += ch
+            else:
+                # ignorar comas y espacios fuera de objetos
+                if depth > 0:
+                    obj_buf += ch
+
 try:
-    with open(GEOJSON_FILE, 'r', encoding='utf-8') as f:
-        geojson_data = json.load(f)
-    features = geojson_data.get('features', [])
-    
-    if not features:
-        print("✗ ERROR: El archivo GeoJSON no tiene 'features' o está vacío.")
-        client.close()
-        exit(1)
-    
-    print(f"✓ Archivo leído correctamente")
-    print(f"  Total de features: {len(features)}")
+    print("Leyendo GeoJSON convertido en streaming (FeatureCollection)...")
+    features_iter = iter_features_from_featurecollection(GEOJSON_FILE)
+    # No contamos aquí el total de features porque sería costoso; la transformación los procesará
+    print("✓ Inicio de lectura en streaming listo")
 except Exception as e:
-    print(f"✗ ERROR: No se pudo leer el archivo GeoJSON.")
+    print(f"✗ ERROR: No se pudo preparar la lectura en streaming del GeoJSON.")
     print(f"  Detalle: {e}")
     client.close()
     exit(1)
@@ -62,14 +117,33 @@ print("\n" + "="*60)
 print("TRANSFORMANDO DATOS AL MODELO DE PRIMERA ENTREGA...")
 print("="*60)
 
-documentos_para_insertar = []
 errores = 0
 contador_id = 1
 
-for idx, feature in enumerate(features, 1):
+# Inserción por batches durante la transformación para no agotar memoria
+BATCH_SIZE = int(os.getenv('MICROSOFT_BATCH_SIZE', '5000'))
+batch = []
+inserted_count = 0
+idx = 0
+print(f"✓ MICROSOFT_BATCH_SIZE = {BATCH_SIZE}")
+for feature in features_iter:
+    idx += 1
     try:
-        if feature.get('geometry'):
+        # Soportar dos formatos de Feature:
+        # 1) Objeto estándar GeoJSON Feature: {'type':'Feature','geometry':{...},'properties':{...}}
+        # 2) Geometría directa (la conversión pudo producir una lista de geometrías):
+        #    {'type':'Polygon','coordinates':[...]}
+        geometry = None
+        properties = {}
+        if isinstance(feature, dict) and feature.get('geometry'):
             geometry = feature['geometry']
+            properties = feature.get('properties', {}) or {}
+        elif isinstance(feature, dict) and feature.get('type') and feature.get('coordinates'):
+            # El objeto en el array es directamente la geometría
+            geometry = { 'type': feature.get('type'), 'coordinates': feature.get('coordinates') }
+            properties = {}
+
+        if geometry is not None:
             
             # Calcular centroide usando Shapely
             try:
@@ -106,44 +180,44 @@ for idx, feature in enumerate(features, 1):
                 'area_m2': area_m2,  # ← Área calculada
                 'loaded_at': datetime.utcnow()
             }
+            # Añadir propiedades originales si existen
+            if properties:
+                documento['properties'] = properties
             
-            documentos_para_insertar.append(documento)
+            batch.append(documento)
             contador_id += 1
-            
-            if idx % 50 == 0:
-                print(f"  Procesados: {idx}/{len(features)}")
+            if idx % 1000 == 0:
+                print(f"  Procesados: {idx} (batch={len(batch)})")
+            if len(batch) >= BATCH_SIZE:
+                try:
+                    print(f"  ▶ Insertando batch de {len(batch)} documentos...")
+                    collection.insert_many(batch)
+                    inserted_count += len(batch)
+                    print(f"  ✓ Insertados (parciales): {inserted_count}")
+                except Exception as e:
+                    print(f"✗ ERROR al insertar batch: {e}")
+                batch = []
     
     except Exception as e:
         errores += 1
         print(f"  ⚠ Error en feature {idx}: {e}")
 
 print(f"\n✓ Transformación completa")
-print(f"  Documentos válidos: {len(documentos_para_insertar)}")
+print(f"  Features procesados: {idx}")
 print(f"  Errores encontrados: {errores}")
 
-if not documentos_para_insertar:
-    print("✗ No se prepararon documentos. Abortando.")
-    client.close()
-    exit(1)
+# Insertar cualquier batch restante
+if batch:
+    try:
+        print(f"  ▶ Insertando batch final de {len(batch)} documentos...")
+        collection.insert_many(batch)
+        inserted_count += len(batch)
+        print(f"  ✓ Insertados (final): {inserted_count}")
+    except Exception as e:
+        print(f"✗ ERROR al insertar batch final: {e}")
 
-# 6. Insertar en MongoDB
-print("\n" + "="*60)
-print("INSERTANDO EN MONGODB...")
-print("="*60)
-
-try:
-    inicio = datetime.now()
-    result = collection.insert_many(documentos_para_insertar)
-    fin = datetime.now()
-    tiempo_carga = (fin - inicio).total_seconds()
-    
-    print(f"✓ INSERCIÓN EXITOSA")
-    print(f"  Documentos insertados: {len(result.inserted_ids)}")
-    print(f"  Tiempo de carga: {tiempo_carga:.2f} segundos")
-    print(f"  Velocidad: {len(result.inserted_ids)/tiempo_carga:.2f} docs/segundo")
-except Exception as e:
-    print(f"✗ ERROR: Falló la inserción de datos.")
-    print(f"  Detalle: {e}")
+if inserted_count == 0:
+    print("✗ No se insertó ningún documento. Abortando.")
     client.close()
     exit(1)
 
@@ -223,3 +297,11 @@ print("="*60)
 print()
 
 client.close()
+
+# Eliminar archivo GeoJSON para liberar espacio
+if os.path.exists(GEOJSON_FILE):
+    try:
+        os.remove(GEOJSON_FILE)
+        print(f"🗑️  Archivo eliminado para optimizar espacio: {GEOJSON_FILE}")
+    except Exception as e:
+        print(f"⚠️  No se pudo eliminar {GEOJSON_FILE}: {e}")

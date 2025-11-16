@@ -180,9 +180,9 @@ def main():
     coll.create_index([("cod_dpto", 1)])
     coll.create_index([("nombre", 1)])
     
-    print("=" * 60)
+    print("="*60)
     print(f"✓ COMPLETADO: {total} municipios cargados en {DB_NAME}.{COL_NAME}")
-    print("=" * 60)
+    print("="*60)
     
     # Mostrar ejemplo
     ejemplo = coll.find_one({}, {"properties": 1, "cod_completo": 1, "nombre": 1})
@@ -193,6 +193,14 @@ def main():
         print(f"  Keys properties: {list(ejemplo.get('properties', {}).keys())[:10]}")
     
     client.close()
+    
+    # Eliminar archivo ZIP para liberar espacio
+    if os.path.exists(ZIP_PATH):
+        try:
+            os.remove(ZIP_PATH)
+            print(f"\n🗑️  Archivo eliminado para optimizar espacio: {ZIP_PATH}")
+        except Exception as e:
+            print(f"⚠️  No se pudo eliminar {ZIP_PATH}: {e}")
 
 if __name__ == "__main__":
     main()

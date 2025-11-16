@@ -21,6 +21,7 @@ services:
       - MONGO_URI=mongodb://mongo-upme:27017
       - MGN_ZIP_PATH=/app/MGN2024_00_COLOMBIA.zip
       - ONEDRIVE_URL=https://drive.google.com/uc?export=download&id=1s4chbFTk9WGp_c7bbeWM8xGJhn0kttHg
+      - MICROSOFT_DRIVE_URL=https://drive.google.com/file/d/1DuHJ0eXuotkKGqctLTbkfUMN1Az7XaVJ/view?usp=sharing
     networks:
       - upme-network
     volumes:
