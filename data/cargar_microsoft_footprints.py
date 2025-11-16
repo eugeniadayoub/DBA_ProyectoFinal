@@ -2,7 +2,9 @@ from pymongo import MongoClient, GEOSPHERE
 import json
 import os
 from datetime import datetime
-from shapely.geometry import shape
+from shapely.geometry import shape, mapping
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry.polygon import orient
 
 # Configuración
 GEOJSON_FILE = os.getenv('MICROSOFT_INPUT_FILE', 'samples/sample_microsoft.geojson')
@@ -103,7 +105,17 @@ def iter_features_from_featurecollection(path):
 
 try:
     print("Leyendo GeoJSON convertido en streaming (FeatureCollection)...")
-    features_iter = iter_features_from_featurecollection(GEOJSON_FILE)
+    # Para archivos pequeños (útil en tests) usar json.load por simplicidad
+    try:
+        size = os.path.getsize(GEOJSON_FILE)
+    except Exception:
+        size = None
+    if size and size < (50 * 1024 * 1024):
+        with open(GEOJSON_FILE, 'r', encoding='utf-8') as _f:
+            js = json.load(_f)
+            features_iter = iter(js.get('features', []))
+    else:
+        features_iter = iter_features_from_featurecollection(GEOJSON_FILE)
     # No contamos aquí el total de features porque sería costoso; la transformación los procesará
     print("✓ Inicio de lectura en streaming listo")
 except Exception as e:
@@ -145,9 +157,34 @@ for feature in features_iter:
 
         if geometry is not None:
             
-            # Calcular centroide usando Shapely
+            # Normalizar y validar geometría usando Shapely antes de cualquier cálculo
+            def normalize_geometry_geojson(geom_json):
+                try:
+                    g = shape(geom_json)
+                except Exception:
+                    return None
+                if not g.is_valid:
+                    try:
+                        from shapely.ops import make_valid
+                        g = make_valid(g)
+                    except Exception:
+                        try:
+                            g = g.buffer(0)
+                        except Exception:
+                            return None
+                try:
+                    if isinstance(g, Polygon):
+                        g = orient(g, sign=1.0)
+                    elif isinstance(g, MultiPolygon):
+                        g = MultiPolygon([orient(p, sign=1.0) for p in g.geoms])
+                except Exception:
+                    pass
+                return g
+
             try:
-                polygon_shapely = shape(geometry)
+                polygon_shapely = normalize_geometry_geojson(geometry)
+                if polygon_shapely is None:
+                    raise ValueError('geometría inválida o no reparable')
                 centroid = polygon_shapely.centroid
                 centroid_geojson = {
                     'type': 'Point',
@@ -175,7 +212,7 @@ for feature in features_iter:
                 'building_id': f"MS-Bldg-{contador_id:08d}",  # ← Campo requerido
                 'fuente': 'Microsoft',  # ← Campo requerido (no "source")
                 'codigo_municipio': None,  # ← Se llenará en fase de integración
-                'geometry': geometry,  # ← Polygon en GeoJSON (ya lo tenemos correcto)
+                'geometry': mapping(polygon_shapely),  # ← Polygon en GeoJSON (normalizado)
                 'centroid': centroid_geojson,  # ← Centroid como GeoJSON Point
                 'area_m2': area_m2,  # ← Área calculada
                 'loaded_at': datetime.utcnow()

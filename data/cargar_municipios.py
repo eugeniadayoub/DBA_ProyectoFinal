@@ -35,6 +35,37 @@ def to_wgs84(geom, src_crs):
         print(f"Warning: no se pudo transformar CRS: {e}")
         return geom
 
+
+def normalize_shapely_geom(geom):
+    """Recibe una geometría Shapely y trata de garantizar que sea válida.
+    Retorna la geometría corregida o None si no se puede arreglar.
+    """
+    try:
+        if geom.is_valid:
+            return geom
+    except Exception:
+        pass
+    try:
+        from shapely.ops import make_valid
+        g = make_valid(geom)
+        if g.is_valid:
+            return g
+    except Exception:
+        try:
+            g = geom.buffer(0)
+            if g.is_valid:
+                return g
+        except Exception:
+            return None
+    try:
+        # como último recurso intentar buffer(0)
+        g = geom.buffer(0)
+        if g.is_valid:
+            return g
+    except Exception:
+        return None
+    return None
+
 def find_shapefile(tmpdir, target):
     """Busca el shapefile específico en el directorio extraído"""
     for root, _, files in os.walk(tmpdir):
@@ -157,11 +188,20 @@ def main():
                     "cod_completo": cod_completo,
                     "nombre": props.get(field_map['nombre_key'], ""),
                     "properties": props,
-                    "geometry": mapping(geom),
+                    # Normalizar geometría antes de insertar
+                    # Si no se puede normalizar, se omite el registro
+                    "geometry": None,
                     "ingest_date": datetime.utcnow(),
                     "source": "MGN_DANE_2024"
                 }
-                
+
+                # intentar normalizar la geometría
+                normalized_geom = normalize_shapely_geom(geom)
+                if normalized_geom is None:
+                    print(f"  ⚠ Geometría inválida no reparable para municipio {cod_completo}; se omite.")
+                    continue
+                doc['geometry'] = mapping(normalized_geom)
+
                 ops.append(InsertOne(doc))
                 
                 if len(ops) >= BATCH:
