@@ -1,0 +1,85 @@
+==============================================
+   REPORTE FINAL - ENTREGA 4
+   Análisis Geoespacial Municipios PDET
+==============================================
+
+Mon Nov 17 06:51:15 AM -05 2025
+
+]0;mongosh mongodb://127.0.0.1:27017/dba_proyectofinal?directConnection=true&serverSelectionTimeoutMS=2000📊 RESUMEN EJECUTIVO
+════════════════════════════════════════════════
+Municipios totales (MGN):        1,121
+Municipios PDET analizados:      [33m170[39m
+Edificios Google en PDET:        2,123,921
+Edificios Microsoft en PDET:     1,292,056
+TOTAL edificios PDET:            3,415,977
+
+✅ VALIDACIÓN DE CALIDAD DE DATOS
+════════════════════════════════════════════════
+Google sin codigo_municipio:     [33m0[39m ✓ CORRECTO
+Microsoft sin codigo_municipio:  [33m0[39m ✓ CORRECTO
+
+📍 TOP 10 MUNICIPIOS PDET - GOOGLE OPEN BUILDINGS
+════════════════════════════════════════════════
+Código  │ Edificios  │ Área Total (ha)
+────────┼────────────┼─────────────────
+76109  │     103890 │           689.15
+05837  │      78926 │           547.75
+18001  │      58135 │           660.50
+52835  │      50493 │           339.00
+23807  │      43123 │           279.63
+19130  │      41281 │           231.52
+19256  │      38900 │           220.19
+13244  │      38386 │           232.18
+05045  │      36337 │           326.52
+81794  │      35958 │           288.86
+
+📍 TOP 10 MUNICIPIOS PDET - MICROSOFT FOOTPRINTS
+════════════════════════════════════════════════
+Código  │ Edificios  │ Área Total (ha)
+────────┼────────────┼─────────────────
+47001  │      59483 │          1234.35
+20001  │      36348 │           817.73
+52835  │      36190 │           404.17
+05837  │      30522 │           339.84
+76109  │      28401 │           663.61
+19256  │      24326 │           202.00
+54810  │      23068 │           226.55
+19698  │      22796 │           320.37
+47189  │      21281 │           286.10
+23807  │      20569 │           193.93
+
+📊 ESTADÍSTICAS POR FUENTE
+════════════════════════════════════════════════
+GOOGLE OPEN BUILDINGS:
+  Total edificios:     2,123,921
+  Área total:          15761.12 hectáreas
+  Área promedio:       74.21 m²
+  Área mínima:         2.29 m²
+  Área máxima:         18939.59 m²
+
+MICROSOFT BUILDING FOOTPRINTS:
+  Total edificios:     1,292,056
+  Área total:          16037.94 hectáreas
+  Área promedio:       124.13 m²
+  Área mínima:         18.02 m²
+  Área máxima:         50697.99 m²
+
+🗺️  COBERTURA GEOGRÁFICA
+════════════════════════════════════════════════
+Municipios PDET con datos Google:    [33m156[39m
+Municipios PDET con datos Microsoft: [33m169[39m
+
+✨ ÍNDICES ESPACIALES CREADOS
+════════════════════════════════════════════════
+Google:
+  ✓ geometry_2dsphere
+  ✓ centroid_2dsphere
+  ✓ building_id_1
+  ✓ codigo_municipio_1
+  ✓ area_m2_1
+
+Microsoft:
+
+============================================
+REPORTE GENERADO EXITOSAMENTE
+============================================

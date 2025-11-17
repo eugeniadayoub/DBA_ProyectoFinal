@@ -1,0 +1,37 @@
+services:
+  mongo-upme:
+    image: mongo:latest
+    container_name: mongo-proyecto-upme
+    ports:
+      - "27017:27017"
+    volumes:
+      - dba_proyectofinal_mongo_data:/data/db
+    networks:
+      - upme-network
+    command: mongod --bind_ip_all
+
+  etl-loader:
+    platform: linux/amd64
+    build:
+      context: ./data
+      dockerfile: Dockerfile
+    container_name: etl-loader-script
+    depends_on:
+      - mongo-upme
+    environment:
+      - MONGO_URI=mongodb://mongo-upme:27017
+      - MGN_ZIP_PATH=/app/MGN2024_00_COLOMBIA.zip
+      - ONEDRIVE_URL=https://drive.google.com/uc?export=download&id=1s4chbFTk9WGp_c7bbeWM8xGJhn0kttHg
+      - MICROSOFT_DRIVE_URL=https://drive.google.com/file/d/1DuHJ0eXuotkKGqctLTbkfUMN1Az7XaVJ/view?usp=sharing
+    networks:
+      - upme-network
+    volumes:
+      - ./data:/app
+    command: bash -c "dos2unix /app/run_etl.sh && chmod +x /app/run_etl.sh && /app/run_etl.sh"
+
+volumes:
+  dba_proyectofinal_mongo_data:
+
+networks:
+  upme-network:
+    driver: bridge
